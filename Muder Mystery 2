@@ -311,7 +311,7 @@ btnToggleCoin.TextSize = 30
 local TweenService = game:GetService("TweenService")
 local autoFarmXu = false
 local tpTweenSpeed = 20
-local MAX_DISTANCE = 1000
+local MAX_DISTANCE = 700
 
 -- Tìm toàn bộ Coin_Server trong workspace
 local function getAllCoins()
@@ -407,7 +407,7 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
-local MAX_DISTANCE = 1000
+local MAX_DISTANCE = 700
 local TweenSpeed = 20
 local autoPlay = false
 
@@ -602,6 +602,83 @@ btnAutoPlay.MouseButton1Click:Connect(function()
     end
 end)
 
+---------------------------------------------------------------------------------------------
+--[[auto shot
+local autoShootEnabled = false
+local runService = game:GetService("RunService")
+local players = game:GetService("Players")
+local localPlayer = players.LocalPlayer
+
+-- Tạo nút ON/OFF
+local btnToggle = Instance.new("TextButton", HomeFrame)
+btnToggle.Size  = UDim2.new(0, 90, 0, 30)
+btnToggle.Position = UDim2.new(0, 240, 0, 160)
+btnToggle.Text  = "OFF"
+btnToggle.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+btnToggle.TextColor3 = Color3.new(1,1,1)
+btnToggle.Font = Enum.Font.SourceSansBold
+btnToggle.TextSize = 30
+
+-- Hàm lấy player có Knife
+local function getMurder()
+    for _, plr in pairs(players:GetPlayers()) do
+        if plr ~= localPlayer then
+            local hasKnife = false
+
+            -- Kiểm tra Knife trên tay
+            if plr.Character and plr.Character:FindFirstChild("Knife") then
+                hasKnife = true
+            end
+
+            -- Kiểm tra Knife trong Backpack
+            if not hasKnife and plr:FindFirstChild("Backpack") then
+                for _, item in pairs(plr.Backpack:GetChildren()) do
+                    if item.Name:lower():find("knife") then
+                        hasKnife = true
+                        break
+                    end
+                end
+            end
+
+            if hasKnife and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                return plr.Character.HumanoidRootPart.Position
+            end
+        end
+    end
+    return nil
+end
+
+-- Auto loop
+runService.RenderStepped:Connect(function()
+    if autoShootEnabled then
+        -- Auto equip Gun nếu có
+        local gun = localPlayer.Backpack:FindFirstChild("Gun")
+        if gun and not localPlayer.Character:FindFirstChild("Gun") then
+            localPlayer.Character.Humanoid:EquipTool(gun)
+        end
+
+        -- Nếu đã cầm Gun, thì bắn
+        local gunTool = localPlayer.Character and localPlayer.Character:FindFirstChild("Gun")
+        local targetPos = getMurder()
+
+        if gunTool and targetPos then
+            local remote = gunTool:FindFirstChild("KnifeLocal"):FindFirstChild("CreateBeam"):FindFirstChild("RemoteFunction")
+            if remote then
+                pcall(function()
+                    remote:InvokeServer(1, targetPos, "AH2")
+                end)
+            end
+        end
+    end
+end)
+
+-- Bấm nút để bật/tắt
+btnToggle.MouseButton1Click:Connect(function()
+    autoShootEnabled = not autoShootEnabled
+    btnToggle.Text = autoShootEnabled and "ON" or "OFF"
+    btnToggle.BackgroundColor3 = autoShootEnabled and Color3.fromRGB(50, 255, 50) or Color3.fromRGB(255, 50, 50)
+end)
+]]
 --=========TITLE================================================================================
 
 local TitleCount = Instance.new("TextLabel", HomeFrame)
@@ -636,3 +713,15 @@ TitleCount.TextScaled = true
 TitleCount.Font = Enum.Font.SourceSansBold
 TitleCount.BorderSizePixel = 2
 TitleCount.BorderColor3 = Color3.new(255, 255, 255)
+--[[
+local TitleCount = Instance.new("TextLabel", HomeFrame)
+TitleCount.Size = UDim2.new(0, 220, 0, 30)
+TitleCount.Position = UDim2.new(0, 10, 0, 160)
+TitleCount.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+TitleCount.TextColor3 = Color3.new(1, 1, 1)
+TitleCount.Text = "AUTO SHOT🎯"
+TitleCount.TextScaled = true
+TitleCount.Font = Enum.Font.SourceSansBold
+TitleCount.BorderSizePixel = 2
+TitleCount.BorderColor3 = Color3.new(255, 255, 255)
+]]--

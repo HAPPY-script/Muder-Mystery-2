@@ -552,3 +552,38 @@ btnAutoPlay.MouseButton1Click:Connect(function()
 		task.spawn(autoPlayLoop)
 	end
 end)
+
+--=========TITLE================================================================================
+
+local TitleCount = Instance.new("TextLabel", HomeFrame)
+TitleCount.Size = UDim2.new(0, 220, 0, 30)
+TitleCount.Position = UDim2.new(0, 10, 0, 10)
+TitleCount.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+TitleCount.TextColor3 = Color3.new(1, 1, 1)
+TitleCount.Text = "ESP ROLE👤"
+TitleCount.TextScaled = true
+TitleCount.Font = Enum.Font.SourceSansBold
+TitleCount.BorderSizePixel = 2
+TitleCount.BorderColor3 = Color3.new(255, 255, 255)
+
+local TitleCount = Instance.new("TextLabel", HomeFrame)
+TitleCount.Size = UDim2.new(0, 220, 0, 30)
+TitleCount.Position = UDim2.new(0, 10, 0, 60)
+TitleCount.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+TitleCount.TextColor3 = Color3.new(1, 1, 1)
+TitleCount.Text = "AUTO FRAM COIN💰"
+TitleCount.TextScaled = true
+TitleCount.Font = Enum.Font.SourceSansBold
+TitleCount.BorderSizePixel = 2
+TitleCount.BorderColor3 = Color3.new(255, 255, 255)
+
+local TitleCount = Instance.new("TextLabel", HomeFrame)
+TitleCount.Size = UDim2.new(0, 220, 0, 30)
+TitleCount.Position = UDim2.new(0, 10, 0, 110)
+TitleCount.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+TitleCount.TextColor3 = Color3.new(1, 1, 1)
+TitleCount.Text = "AUTO PLAY🎮"
+TitleCount.TextScaled = true
+TitleCount.Font = Enum.Font.SourceSansBold
+TitleCount.BorderSizePixel = 2
+TitleCount.BorderColor3 = Color3.new(255, 255, 255)

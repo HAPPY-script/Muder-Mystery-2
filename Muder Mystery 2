@@ -411,23 +411,48 @@ local MAX_DISTANCE = 1000
 local TweenSpeed = 20
 local autoPlay = false
 
--- Tween đến vị trí
+local currentTween = nil
+
 local function tweenTo(position)
 	local char = LocalPlayer.Character
 	if not char then return end
 	local hrp = char:FindFirstChild("HumanoidRootPart")
 	if not hrp then return end
 
-	local distance = (hrp.Position - position).Magnitude
+	-- Hủy tween cũ nếu có
+	if currentTween then
+		currentTween:Cancel()
+		currentTween = nil
+	end
+
+	local startPos = hrp.Position
+	local distance = (startPos - position).Magnitude
 	local time = distance / TweenSpeed
 	local goal = { CFrame = CFrame.new(position + Vector3.new(0, 3, 0)) }
 
 	local tween = TweenService:Create(hrp, TweenInfo.new(time, Enum.EasingStyle.Linear), goal)
+	currentTween = tween
 	tween:Play()
-	tween.Completed:Wait()
+
+	local startTime = tick()
+	while tween.PlaybackState ~= Enum.PlaybackState.Completed do
+		-- Nếu autoPlay bị tắt giữa chừng, hủy tween
+		if not autoPlay then
+			tween:Cancel()
+			break
+		end
+		-- Nếu nhân vật bị dịch chuyển quá xa trong khi tweening => hủy
+		local currentPos = hrp.Position
+		if (currentPos - startPos).Magnitude > 100 then -- dịch chuyển bất thường
+			tween:Cancel()
+			break
+		end
+		task.wait(0.1)
+	end
+
+	currentTween = nil
 end
 
--- Kiểm tra Tool
 local function hasTool(name)
 	for _, t in pairs(LocalPlayer.Backpack:GetChildren()) do
 		if t:IsA("Tool") and t.Name:lower():find(name:lower()) then
@@ -445,42 +470,31 @@ local function hasTool(name)
 	return nil
 end
 
--- Tìm người chơi gần nhất với toolName
-local function getNearestPlayerWithTool(toolName)
+local function equipTool(name)
+	local tool = hasTool(name)
+	if tool and tool.Parent == LocalPlayer.Backpack then
+		LocalPlayer.Character.Humanoid:EquipTool(tool)
+	end
+end
+
+local function getNearestPlayer()
 	local myChar = LocalPlayer.Character
 	local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
 	if not myHRP then return nil end
 
 	local nearest, shortest = nil, math.huge
 	for _, plr in pairs(Players:GetPlayers()) do
-		if plr ~= LocalPlayer and plr.Character then
-			local hasTool = false
-			for _, t in pairs(plr.Backpack:GetChildren()) do
-				if t:IsA("Tool") and t.Name:lower():find(toolName:lower()) then
-					hasTool = true break
-				end
-			end
-			for _, t in pairs(plr.Character:GetChildren()) do
-				if t:IsA("Tool") and t.Name:lower():find(toolName:lower()) then
-					hasTool = true break
-				end
-			end
-			if hasTool then
-				local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
-				if hrp then
-					local dist = (myHRP.Position - hrp.Position).Magnitude
-					if dist < shortest and dist <= MAX_DISTANCE then
-						shortest = dist
-						nearest = hrp
-					end
-				end
+		if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
+			local dist = (myHRP.Position - plr.Character.HumanoidRootPart.Position).Magnitude
+			if dist < shortest and dist <= MAX_DISTANCE then
+				shortest = dist
+				nearest = plr
 			end
 		end
 	end
 	return nearest
 end
 
--- Lấy toàn bộ Coin_Server
 local function getAllCoins()
 	local coins = {}
 	for _, obj in pairs(workspace:GetDescendants()) do
@@ -491,7 +505,6 @@ local function getAllCoins()
 	return coins
 end
 
--- Coin gần nhất chưa đi
 local function getNearestCoin(ignoredCoins)
 	local char = LocalPlayer.Character
 	local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -510,15 +523,15 @@ local function getNearestCoin(ignoredCoins)
 	return nearest
 end
 
--- AUTO LOOP
 local function autoPlayLoop()
 	local visited = {}
 
 	while autoPlay do
 		local knife = hasTool("Knife")
+		equipTool("Knife") -- luôn cầm dao nếu có
 
 		if not knife then
-			-- Chỉ nhặt Coin nếu không có Knife (bỏ qua Gun hoàn toàn)
+			-- Không có Knife => đi nhặt Coin
 			local coin = getNearestCoin(visited)
 			if coin then
 				visited[coin] = true
@@ -529,12 +542,44 @@ local function autoPlayLoop()
 				task.wait(0.5)
 			end
 		else
-			-- Nếu có Knife, tấn công người chơi gần nhất
-			local target = getNearestPlayerWithTool("")
-			if target then
-				tweenTo(target.Position)
-				VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-				VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+			-- Có Knife => đột kích
+			local target = getNearestPlayer()
+			if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+				local hrp = target.Character.HumanoidRootPart
+
+				-- Đột kích: đến vị trí cách dưới chân mục tiêu 10m (theo hướng ngược lại)
+				local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+				if myHRP then
+					local direction = (hrp.Position - myHRP.Position).Unit
+					local sneakPos = hrp.Position - direction * 10
+					tweenTo(sneakPos)
+					task.wait(0.1)
+				end
+
+                -- Bám theo TP liên tục cho đến khi mục tiêu chết hoặc không còn ai trong 1000m
+            	while autoPlay do
+            		local knifeCheck = hasTool("Knife")
+            		if not knifeCheck then break end -- bị reset mất dao thì dừng
+
+            		if not target or not target.Character or not target.Character:FindFirstChild("Humanoid") or target.Character.Humanoid.Health <= 0 then
+            			break -- mục tiêu chết thì thoát vòng lặp
+            		end
+
+            		local currentNearest = getNearestPlayer()
+            		if not currentNearest then break end -- không còn ai trong 1000m
+
+            		equipTool("Knife") -- giữ dao luôn cầm
+            		myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            		if myHRP and target.Character:FindFirstChild("HumanoidRootPart") then
+            			local targetHRP = target.Character.HumanoidRootPart
+            			myHRP.CFrame = targetHRP.CFrame * CFrame.new(0, 0, 0.5) -- TP ngay trên người mục tiêu
+            			VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+            			VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+            		end
+            		task.wait(0.1)
+            	end
+			else
+				task.wait(0.2)
 			end
 		end
 
@@ -542,7 +587,6 @@ local function autoPlayLoop()
 	end
 end
 
--- TOGGLE BUTTON
 btnAutoPlay.MouseButton1Click:Connect(function()
 	autoPlay = not autoPlay
 	btnAutoPlay.Text = autoPlay and "ON" or "OFF"
@@ -551,6 +595,11 @@ btnAutoPlay.MouseButton1Click:Connect(function()
 	if autoPlay then
 		task.spawn(autoPlayLoop)
 	end
+
+    if not autoPlay and currentTween then
+	    currentTween:Cancel()
+	    currentTween = nil
+    end
 end)
 
 --=========TITLE================================================================================
